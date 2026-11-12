@@ -1,0 +1,4 @@
+# The OpenStack blueprint's S2 verification: Keycloak in-cluster over HTTPS from the private CA, the
+# `openstack` realm. The issuer is the exact string Keycloak puts in tokens, port included.
+identityProvider:
+  issuer: https://keycloak-service.keycloak-system.svc.cluster.local:8443/realms/openstack

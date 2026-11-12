@@ -1,0 +1,25 @@
+apiVersion: v2
+name: krateo-openstack-federation
+description: >-
+  Keystone federation with a Krateo Keycloak realm, declared as openstack-keystone-operator-kog custom
+  resources: a dedicated domain for federated users, the Keycloak identity provider, the openid
+  protocol and its mapping (each user into their own tenant group), and a Kyverno GeneratingPolicy
+  that gives every Krateo tenant user a Keystone project, group and member grant. Requires
+  openstack-keystone-operator-kog >= 0.4.0 and Kyverno >= 1.19.
+type: application
+version: CHART_VERSION
+appVersion: "1.0.0"
+icon: https://raw.githubusercontent.com/krateo-platformops/.github/main/brand/logo.svg
+home: https://github.com/krateo-blueprints/krateo-openstack-federation
+# Helm's `sources` is the source code of THIS chart; release tooling resolves the chart version as a
+# tag in each listed repository, so only this repository belongs here.
+sources:
+  - https://github.com/krateo-blueprints/krateo-openstack-federation
+keywords:
+  - openstack
+  - keystone
+  - federation
+  - keycloak
+  - oidc
+maintainers:
+  - name: krateo

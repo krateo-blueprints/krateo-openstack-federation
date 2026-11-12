@@ -1,0 +1,10 @@
+# krateo-openstack-federation — LLM doc index
+docs/index.md: the map of the bundle
+docs/overview.md: what is declared once per cloud and per tenant user, and how a user's project comes and goes
+docs/usage.md: prerequisites, install, Keystone's Apache config (claim names, OIDCClaimDelimiter), verifying
+docs/configuration.md: the values surface
+docs/api.md: the resources rendered and generated, with their annotations
+docs/examples.md: index of examples
+docs/release.md: how a release ships
+docs/log.md: history
+examples/s2/README.md: the S2 verification setup

@@ -1,0 +1,9 @@
+apiVersion: core.krateo.io/v1alpha1
+kind: CompositionDefinition
+metadata:
+  name: krateo-openstack-federation
+  namespace: krateo-system
+spec:
+  chart:
+    url: oci://ghcr.io/krateo-blueprints/charts/krateo-openstack-federation
+    version: CHART_VERSION

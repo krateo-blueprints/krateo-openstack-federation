@@ -1,0 +1,42 @@
+{{- include "of.check" . }}
+{{- $kinds := list "IdentityDomain" "IdentityFederationProvider" "IdentityMapping" "IdentityFederationProtocol" }}
+{{- if .Values.tenants.enabled }}
+{{- $kinds = concat $kinds (list "IdentityProject" "IdentityGroup" "IdentityGroupRoleAssignment") }}
+{{- end }}
+---
+# The bearer Secret the Configurations point at. The KOG's auth-bridge replaces the token on every
+# call (it authenticates to Keystone itself), so this holds a placeholder, never a credential.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.configuration.tokenSecret.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "of.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+type: Opaque
+stringData:
+  {{ .Values.configuration.tokenSecret.key }}: injected-by-auth-bridge
+{{- range $kinds }}
+---
+# How the KOG's {{ . }} controller authenticates.
+apiVersion: {{ $.Values.resourceGroup }}/v1alpha1
+kind: {{ . }}Configuration
+metadata:
+  name: {{ $.Values.configuration.name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "of.labels" $ | nindent 4 }}
+  annotations:
+    # Kept on uninstall: the resources' finalizers call Keystone through this Configuration; if
+    # helm deleted it in the same pass, every delete would fail forever.
+    helm.sh/resource-policy: keep
+spec:
+  authentication:
+    bearer:
+      tokenRef:
+        name: {{ $.Values.configuration.tokenSecret.name }}
+        namespace: {{ $.Release.Namespace }}
+        key: {{ $.Values.configuration.tokenSecret.key }}
+{{- end }}

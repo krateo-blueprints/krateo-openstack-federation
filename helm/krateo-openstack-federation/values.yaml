@@ -1,0 +1,72 @@
+# krateo-openstack-federation
+#
+# Keystone trusts a Krateo Keycloak realm (OpenID Connect) and every Krateo tenant user gets their own
+# Keystone project. Every object here is an openstack-keystone-operator-kog custom resource, or a
+# Kyverno GeneratingPolicy that creates them. Install it AFTER openstack-keystone-operator-kog >= 0.4.0,
+# in the namespace where that KOG runs, on a cluster with Kyverno >= 1.19.
+
+# API group the KOG generates its kinds in (openstack-keystone-operator-kog's resourceGroup).
+resourceGroup: identity.openstack.krateo.io
+# Version the KOG serves its resource kinds at (from the assets' OAS info.version "3.0"); the
+# <Kind>Configuration kinds are always v1alpha1.
+resourceVersion: v3-0
+
+# What happens IN KEYSTONE when the domain, identity provider, protocol or mapping resource is deleted
+# (helm uninstall, a prune, a kubectl delete). `orphan` (default): the Kubernetes object goes and the
+# Keystone object stays, so a mistaken uninstall can never cut every federated user off. `delete`:
+# Keystone objects are deleted with their resources. Per-user tenant objects follow `tenants.deletionPolicy`.
+deletionPolicy: orphan
+
+# How the KOG controllers authenticate. The KOG's auth-bridge injects a fresh Keystone token into
+# every call, so the bearer Secret only has to exist: the chart creates it with a placeholder value.
+configuration:
+  name: keystone-config
+  tokenSecret:
+    name: keystone-token
+    key: token
+
+# The Keystone domain federated users, their groups and their tenant projects live in. Dedicated, so
+# they never mix with the admin and service users of the Default domain.
+domain:
+  name: keycloak
+  description: Users federated from Keycloak, their tenant groups and projects
+
+identityProvider:
+  # Keystone's IdP id: part of the WebSSO URL (.../identity_providers/<id>/protocols/<protocol>/websso).
+  id: keycloak
+  # REQUIRED: the Keycloak realm's issuer, exactly as Keycloak puts it in tokens (scheme, host, port
+  # and path), e.g. https://keycloak.example.com/realms/krateo. Keystone compares it with the
+  # remote_id_attribute it reads from mod_auth_openidc (e.g. HTTP_OIDC_ISS).
+  issuer: ""
+  description: Keycloak (Krateo realm)
+
+protocol:
+  # Keystone's protocol id: must match the mod_auth_openidc Location and `[<protocol>]` config group.
+  id: openid
+
+mapping:
+  id: keycloak_mapping
+  # Names under which Keystone sees the token's claims. They depend on Keystone's Apache config
+  # (mod_auth_openidc OIDCClaimPrefix, and whether claims are passed as environment or headers).
+  remote:
+    subject: HTTP_OIDC_SUB
+    username: HTTP_OIDC_PREFERRED_USERNAME
+    groups: HTTP_OIDC_GROUPS
+  # Only users in this Keycloak group (the groups claim) are mapped at all.
+  requiredGroup: tenants
+
+# One Keystone project per Krateo tenant user, created when the user's tenant Namespace appears (the
+# platform creates it at the user's first sign-in) and removed when it is deleted.
+tenants:
+  enabled: true
+  trigger:
+    # The labels the platform puts on a tenant Namespace: <label>=true, and <userLabel>=<username>.
+    label: krateo.io/tenant
+    userLabel: krateo.io/tenant-user
+  # Project `<projectPrefix><username>`; group `<projectPrefix><username>-members`.
+  projectPrefix: tenant-
+  # The role the user's group holds on the project.
+  role: member
+  # What happens IN KEYSTONE to a user's project and group when their tenant Namespace is deleted
+  # (deprovisioning). `delete` (default): removed with it. `orphan`: left in Keystone.
+  deletionPolicy: delete

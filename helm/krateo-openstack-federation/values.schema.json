@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Krateo OpenStack federation",
+  "description": "Keystone federation with a Krateo Keycloak realm, and a Keystone project per Krateo tenant user, as openstack-keystone-operator-kog resources.",
+  "properties": {
+    "global": {
+      "type": "object",
+      "description": "Helm global values (injected by umbrellas); unused by this chart."
+    },
+    "resourceGroup": {
+      "type": "string",
+      "description": "The KOG's API group."
+    },
+    "resourceVersion": {
+      "type": "string",
+      "description": "The version the KOG serves its resource kinds at."
+    },
+    "deletionPolicy": {
+      "type": "string",
+      "enum": [
+        "orphan",
+        "delete"
+      ],
+      "description": "For the domain, provider, mapping and protocol."
+    },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "tokenSecret": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "key": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "domain": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "identityProvider": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issuer": {
+          "type": "string",
+          "description": "The realm's issuer, exactly as in tokens; https. Required at render."
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "remote": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "subject": {
+              "type": "string",
+              "minLength": 1
+            },
+            "username": {
+              "type": "string",
+              "minLength": 1
+            },
+            "groups": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "requiredGroup": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "tenants": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "trigger": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "userLabel": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "projectPrefix": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "deletionPolicy": {
+          "type": "string",
+          "enum": [
+            "orphan",
+            "delete"
+          ]
+        }
+      }
+    }
+  }
+}

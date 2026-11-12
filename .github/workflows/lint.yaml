@@ -1,0 +1,60 @@
+name: lint
+
+# Lints and renders the chart on pull requests and on every commit that reaches main, so release-tag
+# can refuse a tag on a commit that never passed lint (krateo-blueprints/charts PUBLISHING.md rule 10).
+on:
+  pull_request:
+    paths:
+      - "**"
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  lint-docs:
+    uses: krateo-platformops/.github/.github/workflows/lint-docs.yaml@main
+
+  # Gating, and the check-run release consumers (installer's pin-ci) look for. Each gate self-tests
+  # its detector before judging the chart.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Helm
+        uses: azure/setup-helm@v5
+
+      - name: Chart gates
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet pyyaml jsonschema
+          # core-provider makes every `required` key mandatory on the Composition CR, while values.yaml
+          # defaults apply only at render: requiring a defaulted key makes CRs uncreatable.
+          python3 hack/check-schema-required.py
+          # The chart's invariants: issuer validation, orphan/keep, the mapping, the tenant policy and
+          # Kyverno RBAC, on rendered output.
+          python3 hack/check-federation.py
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Helm
+        uses: azure/setup-helm@v5
+
+      - name: Stamp the CHART_VERSION placeholder for CI
+        run: |
+          find . -type f -name Chart.yaml -not -path '*/charts/*' -not -path './.git/*' \
+            -exec sed -i "s/CHART_VERSION/0.0.0-ci/g" {} +
+
+      - name: helm lint + template (gating)
+        run: |
+          set -euo pipefail
+          helm lint helm/krateo-openstack-federation --set identityProvider.issuer=https://kc.example/realms/krateo
+          helm template release helm/krateo-openstack-federation -f examples/s2/values.yaml > /dev/null
+          helm template release helm/krateo-openstack-federation --set identityProvider.issuer=https://kc.example/realms/krateo --set global.injected=true > /dev/null
+          echo "renders with the example values and with an injected global"

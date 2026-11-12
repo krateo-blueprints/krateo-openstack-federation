@@ -1,0 +1,147 @@
+{{- include "of.check" . }}
+{{- if .Values.tenants.enabled }}
+{{- $t := .Values.tenants }}
+{{- $d := .Values.domain.name }}
+{{- $api := printf "%s/%s" .Values.resourceGroup .Values.resourceVersion }}
+---
+# Every Krateo tenant user gets a Keystone project, a group and the role on it. The trigger is the
+# user's tenant Namespace, which the platform creates at their first sign-in and labels
+# <trigger.label>=true and <trigger.userLabel>=<username>. Kyverno can read Namespaces with its
+# default role, so this needs no access to Secrets. With synchronize, deleting the Namespace
+# (deprovisioning) deletes the generated resources, and their deletion policy decides what happens in
+# Keystone. Users who already have a tenant Namespace when the chart is installed are covered too.
+apiVersion: policies.kyverno.io/v1
+kind: GeneratingPolicy
+metadata:
+  name: {{ .Release.Name }}-tenants
+  labels:
+    {{- include "of.labels" . | nindent 4 }}
+spec:
+  # Server-side apply: Kyverno owns only the fields it sets. The KOG controller adds its own finalizer,
+  # annotations and status to these resources; with a plain update, synchronize treats those as drift
+  # and tries to revert them (measured on Kyverno 1.19.2).
+  useServerSideApply: true
+  evaluation:
+    synchronize:
+      enabled: true
+    generateExisting:
+      enabled: true
+  matchConstraints:
+    resourceRules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - namespaces
+    objectSelector:
+      matchLabels:
+        {{ $t.trigger.label }}: "true"
+  matchConditions:
+    # The username must be present and a valid Kubernetes name part (it names the generated resources).
+    - name: tenant-user
+      expression: >-
+        has(object.metadata.labels) &&
+        {{ $t.trigger.userLabel | quote }} in object.metadata.labels &&
+        object.metadata.labels[{{ $t.trigger.userLabel | quote }}].matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$')
+  variables:
+    - name: user
+      expression: >-
+        object.metadata.labels[{{ $t.trigger.userLabel | quote }}]
+    - name: project
+      expression: >-
+        '{{ $t.projectPrefix }}' + variables.user
+    - name: group
+      expression: >-
+        '{{ $t.projectPrefix }}' + variables.user + '-members'
+  generate:
+    - template:
+        interpolate: cel
+        value: |
+          apiVersion: {{ $api }}
+          kind: IdentityProject
+          metadata:
+            name: (( variables.project ))
+            namespace: {{ .Release.Namespace }}
+            labels:
+              app.kubernetes.io/name: krateo-openstack-federation
+              app.kubernetes.io/instance: {{ .Release.Name }}
+            annotations:
+              krateo.io/deletion-policy: {{ $t.deletionPolicy }}
+          spec:
+            configurationRef:
+              name: {{ .Values.configuration.name }}
+              namespace: {{ .Release.Namespace }}
+            project:
+              name: (( variables.project ))
+              domain: {{ $d }}
+              description: (( 'Krateo tenant ' + variables.user ))
+              enabled: true
+          ---
+          apiVersion: {{ $api }}
+          kind: IdentityGroup
+          metadata:
+            name: (( variables.group ))
+            namespace: {{ .Release.Namespace }}
+            labels:
+              app.kubernetes.io/name: krateo-openstack-federation
+              app.kubernetes.io/instance: {{ .Release.Name }}
+            annotations:
+              krateo.io/deletion-policy: {{ $t.deletionPolicy }}
+          spec:
+            configurationRef:
+              name: {{ .Values.configuration.name }}
+              namespace: {{ .Release.Namespace }}
+            name: (( variables.group ))
+            domain: {{ $d }}
+            description: (( 'Members of Krateo tenant ' + variables.user ))
+          ---
+          apiVersion: {{ $api }}
+          kind: IdentityGroupRoleAssignment
+          metadata:
+            name: (( variables.group + '-{{ $t.role }}' ))
+            namespace: {{ .Release.Namespace }}
+            labels:
+              app.kubernetes.io/name: krateo-openstack-federation
+              app.kubernetes.io/instance: {{ .Release.Name }}
+            annotations:
+              krateo.io/deletion-policy: {{ $t.deletionPolicy }}
+          spec:
+            configurationRef:
+              name: {{ .Values.configuration.name }}
+              namespace: {{ .Release.Namespace }}
+            project: (( variables.project ))
+            projectDomain: {{ $d }}
+            group: (( variables.group ))
+            groupDomain: {{ $d }}
+            role: {{ $t.role }}
+---
+# Kyverno's background controller creates the generated resources, so it needs these permissions.
+# The aggregation label is Kyverno's documented extension point: the rules join its role while this
+# chart is installed, and leave with it.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Name }}-kyverno-tenants
+  labels:
+    {{- include "of.labels" . | nindent 4 }}
+    rbac.kyverno.io/aggregate-to-background-controller: "true"
+rules:
+  - apiGroups:
+      - {{ .Values.resourceGroup }}
+    resources:
+      - identityprojects
+      - identitygroups
+      - identitygrouproleassignments
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+{{- end }}

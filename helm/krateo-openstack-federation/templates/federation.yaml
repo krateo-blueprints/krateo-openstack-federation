@@ -1,0 +1,88 @@
+{{- include "of.check" . }}
+{{- $d := .Values.domain.name }}
+---
+apiVersion: {{ .Values.resourceGroup }}/{{ .Values.resourceVersion }}
+kind: IdentityDomain
+metadata:
+  name: {{ $d }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "of.labels" . | nindent 4 }}
+  annotations:
+    krateo.io/deletion-policy: {{ .Values.deletionPolicy }}
+spec:
+  {{- include "of.configurationRef" . | nindent 2 }}
+  domain:
+    name: {{ $d | quote }}
+    description: {{ .Values.domain.description | quote }}
+    enabled: true
+---
+apiVersion: {{ .Values.resourceGroup }}/{{ .Values.resourceVersion }}
+kind: IdentityFederationProvider
+metadata:
+  name: {{ .Values.identityProvider.id }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "of.labels" . | nindent 4 }}
+  annotations:
+    krateo.io/deletion-policy: {{ .Values.deletionPolicy }}
+spec:
+  {{- include "of.configurationRef" . | nindent 2 }}
+  id: {{ .Values.identityProvider.id | quote }}
+  identity_provider:
+    enabled: true
+    description: {{ .Values.identityProvider.description | quote }}
+    # Federated (shadow) users are created in this domain. Without it Keystone creates a domain per IdP.
+    domain: {{ $d | quote }}
+    remote_ids:
+      - {{ .Values.identityProvider.issuer | quote }}
+---
+apiVersion: {{ .Values.resourceGroup }}/{{ .Values.resourceVersion }}
+kind: IdentityMapping
+metadata:
+  name: {{ .Values.mapping.id | replace "_" "-" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "of.labels" . | nindent 4 }}
+  annotations:
+    krateo.io/deletion-policy: {{ .Values.deletionPolicy }}
+spec:
+  {{- include "of.configurationRef" . | nindent 2 }}
+  id: {{ .Values.mapping.id | quote }}
+  mapping:
+    rules:
+      # A user in the required Keycloak group is the Keystone user `sub` (named after the username), in
+      # the federation domain, and a member of their own tenant group, which holds the role on their
+      # project. A user not in the group matches no rule and is refused.
+      - local:
+          - user:
+              id: "{0}"
+              name: "{1}"
+              domain:
+                name: {{ $d | quote }}
+          - group:
+              name: {{ printf "%s{1}-members" .Values.tenants.projectPrefix | quote }}
+              domain:
+                name: {{ $d | quote }}
+        remote:
+          - type: {{ .Values.mapping.remote.subject }}
+          - type: {{ .Values.mapping.remote.username }}
+          - type: {{ .Values.mapping.remote.groups }}
+            any_one_of:
+              - {{ .Values.mapping.requiredGroup | quote }}
+---
+apiVersion: {{ .Values.resourceGroup }}/{{ .Values.resourceVersion }}
+kind: IdentityFederationProtocol
+metadata:
+  name: {{ printf "%s-%s" .Values.identityProvider.id .Values.protocol.id }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "of.labels" . | nindent 4 }}
+  annotations:
+    krateo.io/deletion-policy: {{ .Values.deletionPolicy }}
+spec:
+  {{- include "of.configurationRef" . | nindent 2 }}
+  idp_id: {{ .Values.identityProvider.id | quote }}
+  id: {{ .Values.protocol.id | quote }}
+  protocol:
+    mapping_id: {{ .Values.mapping.id | quote }}
