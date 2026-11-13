@@ -21,7 +21,7 @@ timestamp: 2026-11-12T00:00:00Z
 | `identityProvider.issuer` | `""` | **required**, `https://`: the realm's issuer exactly as in tokens, e.g. `https://keycloak.example.com/realms/krateo` |
 | `protocol.id` | `openid` | must match Keystone's mod_auth_openidc Location and its `[openid]` config group |
 | `mapping.id` | `keycloak_mapping` | |
-| `mapping.remote.{subject,username,groups}` | `HTTP_OIDC_SUB`, `HTTP_OIDC_PREFERRED_USERNAME`, `HTTP_OIDC_GROUPS` | the names Keystone sees the claims under (see [usage](usage.md#keystones-apache-config)) |
+| `mapping.remote.{subject,username,groups}` | `OIDC-sub`, `OIDC-preferred_username`, `OIDC-groups` | mod_auth_openidc's environment variables (see [usage](usage.md#keystones-apache-config)); not `HTTP_OIDC_*`, which loses claims with `_` |
 | `mapping.requiredGroup` | `tenants` | only users in this Keycloak group are mapped |
 | `tenants.enabled` | `true` | generate a project, group and grant per tenant user |
 | `tenants.trigger.{label,userLabel}` | `krateo.io/tenant` / `krateo.io/tenant-user` | a tenant Namespace carries `<label>=true` and `<userLabel>=<username>` |
