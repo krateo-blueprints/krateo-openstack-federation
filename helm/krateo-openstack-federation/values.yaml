@@ -46,12 +46,14 @@ protocol:
 
 mapping:
   id: keycloak_mapping
-  # Names under which Keystone sees the token's claims. They depend on Keystone's Apache config
-  # (mod_auth_openidc OIDCClaimPrefix, and whether claims are passed as environment or headers).
+  # Names under which Keystone sees the token's claims: mod_auth_openidc's environment variables,
+  # `<OIDCClaimPrefix><claim>` with the claim's case kept (prefix "OIDC-"). Not the header form
+  # HTTP_OIDC_*: Apache drops request headers whose name contains "_", so HTTP_OIDC_PREFERRED_USERNAME
+  # never exists (measured on S2), and environment variables cannot be supplied by a client.
   remote:
-    subject: HTTP_OIDC_SUB
-    username: HTTP_OIDC_PREFERRED_USERNAME
-    groups: HTTP_OIDC_GROUPS
+    subject: OIDC-sub
+    username: OIDC-preferred_username
+    groups: OIDC-groups
   # Only users in this Keycloak group (the groups claim) are mapped at all.
   requiredGroup: tenants
 

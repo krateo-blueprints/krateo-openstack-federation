@@ -11,6 +11,17 @@ timestamp: 2026-11-12T00:00:00Z
 
 Curated history; release notes live in GitHub Releases.
 
+## 2026-11-13 — 0.1.1: the mapping reads mod_auth_openidc's environment variables
+
+`mapping.remote` now defaults to `OIDC-sub`, `OIDC-preferred_username` and `OIDC-groups`, the
+environment form, instead of `HTTP_OIDC_*`. Measured on the OpenStack blueprint's S2 verification
+(Keycloak 26.6.3, keystone-oidc 2026.1 with mod_auth_openidc 2.4.15): Apache drops request headers whose
+name contains `_`, so `HTTP_OIDC_PREFERRED_USERNAME` was never set, the mapping's username remote
+matched nothing, and every login failed with "Could not map any federated user properties". With
+`OIDC-preferred_username` alone changed, the login mapped the user into the `keycloak` domain and its
+tenant project. All three move to the environment form: it is set by mod_auth_openidc, cannot come
+from a client header, and works for any claim name.
+
 ## 2026-11-12 — 0.1.0
 
 First release. See [overview](overview.md). Measured on GKE (Keystone 2026.1 from the OpenStack

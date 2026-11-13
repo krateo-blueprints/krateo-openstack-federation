@@ -34,12 +34,14 @@ included when there is one. Keystone compares it with the remote id mod_auth_ope
 
 ## Keystone's Apache config
 
-The mapping reads three claims under the names in `mapping.remote` (default `HTTP_OIDC_SUB`,
-`HTTP_OIDC_PREFERRED_USERNAME`, `HTTP_OIDC_GROUPS`). What those names are depends on Keystone's
-mod_auth_openidc block:
+The mapping reads three claims under the names in `mapping.remote`: by default mod_auth_openidc's
+environment variables `OIDC-sub`, `OIDC-preferred_username` and `OIDC-groups` (`OIDCClaimPrefix
+"OIDC-"`, the claim's case kept). Use the environment form, not the header form `HTTP_OIDC_*`:
 
-- `OIDCClaimPrefix "OIDC-"` gives environment names such as `OIDC-groups` and, when claims are also
-  passed as headers, `HTTP_OIDC_GROUPS`. Set `mapping.remote` to the form your Keystone sees.
+- Apache drops request headers whose name contains `_`, so `HTTP_OIDC_PREFERRED_USERNAME` never
+  reaches Keystone; with the header form the mapping matched nothing and every login was refused
+  ("Could not map any federated user properties", measured on the S2 verification).
+- Environment variables are set by mod_auth_openidc itself; a client cannot supply them.
 - **`OIDCClaimDelimiter ";"` is required.** Keystone splits a multi-valued assertion on `;` only.
   With mod_auth_openidc's default `,`, a user in two groups arrives as one value
   (`tenants,platform-admins`), the mapping's `tenants` condition does not match, and the user is

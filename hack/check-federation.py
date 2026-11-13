@@ -76,6 +76,10 @@ if local["group"].get("name") != "tenant-{1}-members":
     errors.append(f"mapping group name must be tenant-{{1}}-members: {local['group']}")
 if len(remote) != 3 or remote[2].get("any_one_of") != ["tenants"]:
     errors.append(f"mapping remote must be sub, username, groups gated on [tenants]: {remote}")
+# mod_auth_openidc's environment form: Apache drops request headers whose name contains "_", so the
+# header form HTTP_OIDC_PREFERRED_USERNAME never exists (measured on S2: every login refused).
+if [r.get("type") for r in remote] != ["OIDC-sub", "OIDC-preferred_username", "OIDC-groups"]:
+    errors.append(f"mapping remote types must default to the environment form OIDC-<claim>: {[r.get('type') for r in remote]}")
 
 gp = by("GeneratingPolicy")[0]["spec"]
 if not gp["evaluation"]["synchronize"]["enabled"] or not gp["evaluation"]["generateExisting"]["enabled"]:
